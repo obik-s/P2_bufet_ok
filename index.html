@@ -2,148 +2,239 @@
 <html lang="cs">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Objednávkový formulář</title>
-
+<title>Objednávka školního bufetu</title>
+ 
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        max-width: 600px;
-        margin: auto;
-        padding: 20px;
-        background-color: #f5f5f5;
-    }
-
-    h1 {
-        text-align: center;
-    }
-
-    .item {
-        margin-bottom: 10px;
-        background: white;
-        padding: 10px;
-        border-radius: 8px;
-    }
-
-    input {
-        width: 100%;
-        padding: 8px;
-        margin-top: 5px;
-        margin-bottom: 10px;
-        border-radius: 6px;
-        border: 1px solid #ccc;
-    }
-
-    button {
-        width: 100%;
-        padding: 12px;
-        background-color: #0078d4;
-        color: white;
-        font-size: 16px;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-    }
-
-    button:hover {
-        background-color: #005ea6;
-    }
+body {
+font-family: Arial, sans-serif;
+background: #f4f7fb;
+}
+h1 {
+text-align: center;
+background: #2a72d4;
+color: white;
+padding: 20px;
+}
+.container {
+width: 90%;
+max-width: 500px;
+margin: 30px auto;
+background: white;
+padding: 25px;
+border-radius: 12px;
+}
+.item {
+display: flex;
+justify-content: space-between;
+margin: 12px 0;
+font-size: 18px;
+}
+input[type="number"] {
+width: 70px;
+text-align: center;
+}
+#celkem, #pocet {
+text-align: center;
+font-size: 22px;
+margin-top: 15px;
+font-weight: bold;
+color: #2a72d4;
+}
+button {
+width: 100%;
+padding: 15px;
+margin-top: 30px;
+font-size: 24px;
+background: #ff6b35;
+color: white;
+border: none;
+border-radius: 10px;
+cursor: pointer;
+}
+button:hover {
+background: #e85a28;
+}
+input {
+width: 100%;
+padding: 8px;
+margin-top: 5px;
+}
 </style>
 </head>
-
+ 
 <body>
-
-<h1>Objednávkový formulář</h1>
-
-<!-- ========================= -->
-<!-- POVINNÁ VSTUPNÍ POLE -->
-<!-- ========================= -->
-<input type="text" id="name" placeholder="Příjmení Jméno" required>
-<input type="tel" id="phone" placeholder="+420 000 000 000" required>
-
-<div class="item">
-    <label>Produkt A (100 Kč)</label>
-    <input type="number" id="produktA" min="0" value="0">
+ 
+<h1>SŠ Kostka – OBJEDNÁVKY BUFET</h1>
+ 
+<div class="container">
+ 
+<div id="items"></div>
+ 
+<div id="celkem">Celková cena: 0 Kč</div>
+<div id="pocet">Počet kusů: 0</div>
+ 
+<!-- ========================================= -->
+<!-- ✅ NOVÁ POLE: JMÉNO + TELEFON -->
+<!-- ========================================= -->
+<div style="margin-top:20px;">
+<label>
+VAŠE JMÉNO (zapisujte ve formátu Příjmení Jméno)
+<input type="text" id="jmeno" required>
+</label>
 </div>
-
-<div class="item">
-    <label>Produkt B (200 Kč)</label>
-    <input type="number" id="produktB" min="0" value="0">
+ 
+<div style="margin-top:10px;">
+<label>
+TELEFON
+<input type="tel" id="telefon" placeholder="+420 000 000 000" required>
+</label>
 </div>
-
-<div class="item">
-    <label>Produkt C (300 Kč)</label>
-    <input type="number" id="produktC" min="0" value="0">
-</div>
-
+ 
 <button onclick="odeslatObjednavku()">ODESLAT OBJEDNÁVKU</button>
-
+ 
+</div>
+ 
 <script>
-/* ===================================== */
-/* MAILTO FUNKCE PRO ODESLÁNÍ OBJEDNÁVKY */
-/* ===================================== */
+ 
+let items = [];
+ 
+// ✅ načítání CSV
+async function loadCSV() {
+try {
+const response = await fetch("data_bufet.csv?t=" + Date.now());
+if (!response.ok) {
+throw new Error("Soubor nebyl nalezen");
+}
+const text = await response.text();
+parseCSV(text);
+renderItems();
+} catch (err) {
+console.error(err);
+alert("Chyba načítání CSV.");
+}
+}
+ 
+// ✅ parsování CSV (přeskočení hlavičky)
+function parseCSV(text) {
+items = [];
+const lines = text.split("\n");
+ 
+for (let i = 1; i < lines.length; i++) {
+const line = lines[i].trim();
+if (!line) continue;
+ 
+const [nazev, cena] = line.split(";");
+ 
+if (nazev && cena) {
+items.push({
+nazev: nazev.trim(),
+cena: parseFloat(cena.replace(",", ".")),
+mnozstvi: 0
+});
+}
+}
+}
+ 
+// ✅ vykreslení
+function renderItems() {
+const container = document.getElementById("items");
+container.innerHTML = "";
+ 
+items.forEach((item, index) => {
+const div = document.createElement("div");
+div.className = "item";
+ 
+div.innerHTML = `
+<span>${item.nazev} (${item.cena} Kč)</span>
+<input type="number" min="0" value="0"
+onchange="updateItem(${index}, this.value)">
+`;
+ 
+container.appendChild(div);
+});
+}
+ 
+// ✅ změna množství
+function updateItem(index, value) {
+items[index].mnozstvi = parseInt(value) || 0;
+updateSummary();
+}
+ 
+// ✅ přepočet
+function updateSummary() {
+let celkem = 0;
+let pocet = 0;
+ 
+items.forEach(item => {
+celkem += item.cena * item.mnozstvi;
+pocet += item.mnozstvi;
+});
+ 
+document.getElementById("celkem").innerText =
+"Celková cena: " + celkem.toFixed(2) + " Kč";
+ 
+document.getElementById("pocet").innerText =
+"Počet kusů: " + pocet;
+}
+ 
+/* ========================================= */
+/* ✅ FUNKCE MAILTO + VALIDACE */
+/* ========================================= */
+ 
 function odeslatObjednavku() {
-
-    const jmeno = document.getElementById("name").value.trim();
-    const telefon = document.getElementById("phone").value.trim();
-
-    // VALIDACE
-    if (!jmeno || !telefon) {
-        alert("Vyplňte prosím jméno a telefon.");
-        return;
-    }
-
-    // Bezpečné načtení hodnot (řeší NaN)
-    function getValue(id) {
-        return parseInt(document.getElementById(id).value) || 0;
-    }
-
-    const produkty = [
-        {nazev: "Produkt A", cena: 100, pocet: getValue("produktA")},
-        {nazev: "Produkt B", cena: 200, pocet: getValue("produktB")},
-        {nazev: "Produkt C", cena: 300, pocet: getValue("produktC")}
-    ];
-
-    let seznam = "";
-    let celkem = 0;
-
-    produkty.forEach(p => {
-        if (p.pocet > 0) {
-            const suma = p.pocet * p.cena;
-            celkem += suma;
-
-            seznam += `${p.nazev}: ${p.pocet} ks × ${p.cena} Kč = ${suma} Kč\n`;
-        }
-    });
-
-    if (celkem === 0) {
-        alert("Vyberte alespoň jeden produkt.");
-        return;
-    }
-
-    const bodyText =
-`OBJEDNÁVKA
-
+ 
+const jmeno = document.getElementById("jmeno").value.trim();
+const telefon = document.getElementById("telefon").value.trim();
+ 
+let objednavka = "";
+let celkem = 0;
+let pocet = 0;
+ 
+items.forEach(item => {
+if (item.mnozstvi > 0) {
+objednavka += `${item.nazev} - ${item.mnozstvi} ks - ${item.mnozstvi * item.cena} Kč\n`;
+celkem += item.cena * item.mnozstvi;
+pocet += item.mnozstvi;
+}
+});
+ 
+// ✅ VALIDACE
+if (!jmeno || !telefon) {
+alert("Vyplňte jméno a telefon.");
+return;
+}
+ 
+if (pocet === 0) {
+alert("Nevybral jsi žádné položky!");
+return;
+}
+ 
+const text = `
+Objednávka bufetu:
+ 
 Jméno: ${jmeno}
 Telefon: ${telefon}
-
+ 
 Položky:
-${seznam}
-------------------------
-CELKEM: ${celkem} Kč`;
-
-    /* ===================================== */
-    /* GENEROVÁNÍ MAILTO ODKAZU */
-    /* ===================================== */
-    const mailto =
-        `mailto:obadalova.kristyna@kostka-skola.cz`
-        + `?subject=${encodeURIComponent("Nová objednávka")}`
-        + `&body=${encodeURIComponent(bodyText)}`;
-
-    // Otevření e-mailu
-    window.location.href = mailto;
+${objednavka}
+ 
+Celkem kusů: ${pocet}
+Celková cena: ${celkem.toFixed(2)} Kč
+`;
+ 
+const mailtoLink =
+"mailto:zetkova.marketa@kostka-skola.cz"
++ "?subject=" + encodeURIComponent("Objednávka bufet")
++ "&body=" + encodeURIComponent(text);
+ 
+window.location.href = mailtoLink;
 }
+ 
+// start
+loadCSV();
+ 
 </script>
-
+ 
 </body>
 </html>
+ 
